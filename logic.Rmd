@@ -1,0 +1,118 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+library(readxl)
+library(NbClust)
+library(factoextra)
+library(Rmisc)
+library(FactoMineR)
+library(corrplot)
+
+myplot = function(x, y){
+  print(summary(x))
+  print(summary(y))
+  print(cor.test(x, y))
+  plot(x, y, xlab = "hand wash", ylab = "infection case")
+}
+
+mynb = function(mymx){
+  myAHCnum = NbClust(mymx, method = "ward.D", index = "all")
+  myNHCnum = NbClust(mymx, method = "kmeans", index = "alllong")
+  
+  fig1 = fviz_nbclust(myAHCnum, method = "silhouette")
+  fig2 = fviz_nbclust(myNHCnum, method = "gap_stat", nboot = 100)
+
+  multiplot(fig1, fig2, cols = 2)
+}
+
+mycl = function(num_cls, dt_cls){
+  myAHC = hcut(dt_cls, k = num_cls, stand = TRUE, graph = FALSE)
+  myNHC = kmeans(dt_cls, num_cls, iter.max = 100, nstart = nrow(dt_cls))
+
+  fig3 = fviz_silhouette(myAHC, label = TRUE, rotate = TRUE, print.summary = FALSE)
+  fig4 = fviz_cluster(myNHC, data = dt_cls, repel = TRUE)
+  
+  multiplot(fig3)
+  multiplot(fig4)
+}
+```
+
+
+```{r}
+exlData = read_excel("data.xlsx", sheet = "data", 
+    col_types = c("text", "numeric", "numeric", "numeric"))
+print(exlData)
+
+mydata = exlData[,c(2, 3)]
+mydata$washlog = log10(mydata$Handwash)
+mydata$caselog = log10(mydata$Infection)
+
+myplot(mydata$Handwash, mydata$Infection)
+myplot(mydata$washlog, mydata$caselog)
+```
+
+
+```{r}
+clsData60 = as.matrix(mydata[,c(3, 4)])
+rownames(clsData60) = exlData$English
+mynb(clsData60)
+
+for (i in c(3, 14)){
+  mycl(i, clsData60)
+}
+```
+
+```{r}
+clsData20 = clsData60[order(clsData60[, 2], decreasing = TRUE),]
+clsData20 = clsData20[c(1:20),]
+mynb(clsData20)
+
+for (i in c(4)){
+  mycl(i, clsData20)
+}
+```
+
+```{r}
+df_aged = na.omit(exlData)
+df_aged$washlog = log10(df_aged$Handwash)
+df_aged$caselog = log10(df_aged$Infection)
+df_aged$agedlog = log10(df_aged$Aged)
+
+pcaData = as.matrix(df_aged[,c(5:7)])
+row.names(pcaData) = df_aged$English[1:nrow(pcaData)]
+```
+
+```{r}
+mypca = PCA(pcaData, scale.unit = TRUE, graph = FALSE)
+mypca$eig
+```
+
+```{r}
+fig10 = fviz_pca_var(mypca, col.var = "cos2", gradient.cols = c("blue", "red"), repel = TRUE)
+fig11 = fviz_pca_var(mypca, col.var = "contrib", gradient.cols = c("blue", "red"), repel = TRUE)
+multiplot(fig10, fig11, cols = 2)
+```
+
+```{r}
+corrplot(mypca$var$cos2, addCoef.col = "gray")
+corrplot(mypca$var$contrib, is.corr = FALSE, addCoef.col = "gray")
+```
+
+```{r}
+fviz_pca_biplot(
+  mypca,
+  col.var = "blue",
+  col.ind = "cos2",
+  gradient.cols = c("blue", "red"),
+  repel = TRUE)
+```
+
+
+```{r}
+for (i in c(2, 3)){
+  mycl(i, agedData[,c(3, 2)])
+}
+```
